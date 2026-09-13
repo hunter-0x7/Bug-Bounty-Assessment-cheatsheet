@@ -77,3 +77,89 @@ Example:
 - Network Security Config analysis
 - Root detection bypass testing
 - APK reverse engineering and runtime instrumentation
+
+
+# Physical Security Testing Checklist
+
+## Testing: Communication with Mobile and Web Applications
+
+### 1) Reverse Engineer the Mobile Application
+
+#### 1.1 Search for ports being used
+**Tools:** JADx, APKTool
+
+- Identify hardcoded port numbers (`80`, `443`, `8080`, `1883`, etc.)
+- Trace socket/API client initialization
+- Locate fallback ports and alternate endpoints
+- Map local vs. remote communication ports
+
+#### 1.2 Search for hardcoded firmware download URLs
+**Tools:** JADx, APKTool
+
+- Find OTA/firmware download endpoints
+- Detect non-TLS firmware links (`http://`)
+- Identify update manifest and version-check URLs
+- Enumerate backup/mirror firmware paths
+
+#### 1.3 Identify command messaging format
+**Tools:** JADx, APKTool
+
+- Determine payload format (JSON, protobuf, binary, base64)
+- Identify command names, action IDs, opcodes
+- Locate serializer/deserializer implementation
+- Review message integrity controls (signatures/checksums)
+
+#### 1.4 Search for hardcoded SSIDs
+**Tools:** JADx, APKTool
+
+- Locate default/provisioning SSID values
+- Identify setup-mode naming patterns
+- Trace where SSIDs are validated or trusted in logic
+
+#### 1.5 Search for hardcoded encryption keys
+**Tools:** JADx, APKTool
+
+- Search for embedded AES/RSA keys
+- Identify static IVs, salts, and nonces
+- Detect key reuse across build variants
+- Flag weak/legacy cryptographic primitives
+
+---
+
+### 2) Intercept the Traffic
+
+#### 2.1 Search and analyze traffic between devices
+
+**Capture paths:**
+- Mobile App ↔ Backend API
+- Mobile App ↔ Device (LAN/BLE, where applicable)
+- Device ↔ Cloud (if observable)
+
+**Analyze for:**
+- Authentication and session token handling flaws
+- Cleartext traffic or TLS misconfiguration
+- Replay vulnerabilities (missing nonce/timestamp)
+- Broken authorization in command execution
+- Sensitive data leakage in headers, params, or body
+
+---
+
+## Suggested Evidence to Collect
+
+- Decompiled code screenshots/snippets (class + method names)
+- Extracted endpoints and port mapping table
+- Sample decoded command messages
+- Traffic captures showing insecure patterns
+- Reproduction steps and security impact notes
+
+## Reporting Tips
+
+For each finding, include:
+1. **Title**
+2. **Affected component** (mobile app / API / device / firmware update path)
+3. **Steps to reproduce**
+4. **Observed behavior**
+5. **Expected secure behavior**
+6. **Impact**
+7. **Recommendation**
+8. **Evidence**
