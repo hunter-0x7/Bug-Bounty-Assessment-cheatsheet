@@ -1,243 +1,447 @@
 # Reconnaissance Checklist — Web Application Security
 
-Purpose
-
-A practical, prioritized reconnaissance checklist and toolkit for web application bug‑bounty assessments.
-Goal: find domains, subdomains, endpoints, credentials/leaks, cloud assets, technologies, and public disclosures efficiently and reproducibly.
-
----
-
-## Quick Start (high-level playbook)
-
-1) Passive collection: certificates, public repos, search engines, Wayback.
-2) Passive subdomain aggregation: crt.sh, CertSpotter, security lists, assetfinder, subdomain bruteforcing (low/no-noise).
-3) Active enumeration: amass/subfinder + massdns for resolution — take care with rate limits and scope.
-4) Endpoint discovery: Wayback/waybackurls, gau/gauplus, Burp spider for auth-required areas.
-5) JS & API surface analysis: parse JS for endpoints, keys, or hidden parameters.
-6) Cloud & storage checks: S3/GS buckets, cloud console exposures.
-7) Triaging & fingerprinting: technology detection, WAF/CDN identification, prioritize targets for manual testing.
+> A practical, prioritized reconnaissance playbook for web application bug bounty assessments.
+>
+> Goal: discover domains, subdomains, endpoints, credentials/leaks, cloud assets, technologies, and public disclosures efficiently and reproducibly.
 
 ---
 
-## Notes & rules of engagement
+## 0) Rules of Engagement (Read First)
 
-- Always confirm scope / targets before active testing.
-- Check for DNS wildcard records to avoid false positives (see Wildcard check).
-- Respect rate limits, robots.txt, and the program's allowed testing rules.
-- Keep output organized and timestamped (CSV/JSON form).
-
----
-
-## Wordlists
-
-- Custom: CeWL (crawl & create wordlists)
-
-  - Example: `cewl -m 4 -w dict.txt https://site.url`
-
-- Collections:
-  - JHaddix all.txt: https://gist.github.com/jhaddix/f64c97d0863a78454e44c2f7119c2a6a
-  - SecLists raft-large-words.txt: https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/raft-large-words.txt
-
-- Local tips: combine common prefixes, services, and environment names; use altdns for permutations.
+- Always confirm scope before active testing.
+- Respect program policy, rate limits, and allowed testing techniques.
+- Check wildcard DNS behavior before brute force to reduce false positives.
+- Keep results timestamped and reproducible (`CSV`/`JSON` + raw logs).
 
 ---
 
-## Subdomain enumeration (passive → active)
+## 1) Quick Start Workflow (High-Level)
 
-**Pre-check: check for DNS wildcards:**
+1. **Passive collection**: CT logs, public repos, search engines, Wayback.
+2. **Subdomain aggregation**: crt.sh, CertSpotter, security sources, assetfinder.
+3. **Active enumeration**: amass/subfinder + massdns resolution (scope-aware, rate-limited).
+4. **Endpoint discovery**: Wayback/waybackurls, gau/gauplus, authenticated spidering.
+5. **JS/API analysis**: parse JavaScript for endpoints, secrets, hidden params.
+6. **Cloud/storage checks**: S3/Google Cloud/Azure buckets and misconfigurations.
+7. **Fingerprinting & triage**: stack detection, WAF/CDN hints, attack-surface ranking.
 
-- `dig +short randomsubdomain.example.com`
+---
 
-- If responses exist for random names, treat brute-force results as suspect.
+## 2) Target Mapping
 
-**Passive sources (low-noise)**
+### Top-level target
 
-- crt.sh (certificates)
-- Certspotter / Censys / Shodan
-- GitHub/GitLab repository scraping (dorks)
-- DNSDumpster, SecurityTrails, PassiveTotal
+- `target.com`
+  - Enumerate known IP ranges / host IPs.
+  - Track DNS records and related infrastructure.
 
-**Tools (suggested)**
+---
 
-- assetfinder: https://github.com/tomnomnom/assetfinder
-- amass (passive + active): https://github.com/OWASP/Amass
-  - Example: `amass enum -passive -d example.com -o amass_passive.txt`
-- subfinder: https://github.com/ice3man543/subfinder
-- dnsdumpster: https://dnsdumpster.com/
-- ReconDog, Sublist3r, knock, ReconCat
+## 3) Wordlists
 
-**Active discovery & bruteforce**
+### Custom wordlists
 
-- massdns (fast resolution), masscan for port scans
-- altdns for permutations: `python3 altdns.py -i subdomains.txt -o domains.txt -w words.txt`
-- subbrute, dnsrecon, dnssearch, dnsmap
+- **CeWL**
+  - Build target-specific words from crawlable content.
+  - Example:
 
-**Example flow:**
+```bash
+cewl -m 4 -w dict.txt https://site.url
+```
 
-1. Aggregate (crt.sh, amass, subfinder, assetfinder) → `subs.txt`
-2. Permute with altdns → `permuted.txt`
+### Public wordlists
+
+- **JHaddix all.txt**
+  - https://gist.github.com/jhaddix/f64c97d0863a78454e44c2f7119c2a6a
+- **SecLists raft-large-words.txt**
+  - https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/raft-large-words.txt
+
+### Local tuning tips
+
+- Combine environment patterns: `dev`, `stg`, `uat`, `prod`, `api`, `admin`, `internal`.
+- Add brand/service terms and regional codes.
+- Use **altdns** permutations to expand seed lists.
+
+---
+
+## 4) Subdomain Enumeration (Passive → Active)
+
+### 4.1 Wildcard pre-check (critical)
+
+```bash
+dig +short randomsubdomain.example.com
+```
+
+- If random labels resolve, treat brute-force positives as potentially invalid.
+
+### 4.2 Passive sources (low-noise)
+
+- crt.sh (certificate transparency)
+- CertSpotter / Censys / Shodan
+- GitHub/GitLab code and commit dorks
+- DNSDumpster / SecurityTrails / PassiveTotal
+
+### 4.3 Tools
+
+- Knock — https://github.com/guelfoweb/knock
+- Sublist3r — https://github.com/aboul3la/Sublist3r
+- LazyRecon — https://github.com/capt-meelo/LazyRecon
+- subfinder — https://github.com/ice3man543/subfinder
+- amass — https://github.com/OWASP/Amass
+- ReconDog — https://github.com/s0md3v/ReconDog
+- subbrute — https://github.com/TheRook/subbrute
+- cloudflare_enum — https://github.com/mandatoryprogrammer/cloudflare_enum
+- dnsmap — https://github.com/makefu/dnsmap
+- altdns — https://github.com/infosec-au/altdns
+- dnsrecon — https://github.com/darkoperator/dnsrecon
+- dnssearch — https://github.com/evilsocket/dnssearch
+- fierce — https://github.com/mschwager/fierce
+- second-order — https://github.com/mhmdiaa/second-order
+- assetfinder — https://github.com/tomnomnom/assetfinder
+- DNSDumpster — https://dnsdumpster.com/
+- massdns
+- nmap
+
+### 4.4 Active discovery and validation
+
+- Permutation generation with altdns
+- Fast resolution with massdns
+- Port/service validation with nmap
+
+### 4.5 Example flow
+
+1. Aggregate from passive tools → `subs.txt`
+2. Permute candidates with altdns → `permuted.txt`
 3. Resolve with massdns → `resolved.txt`
-4. Filter & scan open ports with nmap
+4. Validate and prioritize with nmap/http probing
 
 ---
 
-## Domain-level correlation & related domains
+## 5) Domain Correlation & Related Assets
 
-- Reverse WHOIS: https://viewdns.info/reversewhois/, https://reverse.report/
-- Reverse IP / Virtual host detection: https://www.yougetsignal.com/tools/web-sites-on-web-server/
-- Domains on same nameserver: https://dns.coffee/nameservers
-- DomLink (linking domains): https://github.com/vysecurity/DomLink
-- Expired domains and takeover checks: domainhunter (https://github.com/threatexpress/domainhunter)
+### Reverse WHOIS
 
----
+- https://viewdns.info/reversewhois/
+- https://reverse.report/
 
-## Endpoint discovery (URLs, parameters, endpoints)
+### Reverse IP / virtual host mapping
 
-- Wayback Machine (archive.org) and waybackurls
-- gau / gauplus (get all URLs) - great for archived endpoints and parameter discovery
-  - Example: `echo example.com | gau --subs > gau_urls.txt`
-- cc.py (content discovery) https://github.com/si9int/cc.py
-- Web spidering (Burp, OWASP ZAP) for authenticated areas
+- https://www.yougetsignal.com/tools/web-sites-on-web-server/
+- Reverse DNS via nmap
 
----
+### Shared infrastructure pivots
 
-## JavaScript & API surface analysis
+- Same nameserver pivot: https://dns.coffee/nameservers
+- Related domains via link analysis:
+  - DomLink — https://github.com/vysecurity/DomLink
 
-- Collect and parse JS files (hidden endpoints, API keys, feature flags)
-- Tools:
-  - JSParser / LinkFinder / Subjs / gf + patterns
-    - JSParser: https://github.com/nahamsec/JSParser
-    - LinkFinder: https://github.com/GerbenJavado/LinkFinder
-  - grep, ripgrep for quick patterns: e.g., `rg -n "apiKey|secret|token|endpoint|eval\("`
+### Expired/legacy domain risks
 
-**Example JS workflow:**
-
-1. Gather JS files via crawling, wayback, gau, and site scraping.
-2. Run LinkFinder/JSParser to extract endpoints and parameters.
-3. Feed endpoints into a wordlist for fuzzing (ffuf/gf).
+- domainhunter — https://github.com/threatexpress/domainhunter
 
 ---
 
-## Site inspection & visual recon
+## 6) Endpoint Discovery (URLs, Params, APIs)
 
-- Visual screenshots and quick triage:
-  - Aquatone: https://github.com/michenriksen/aquatone
-  - EyeWitness (or Eyewitness alternatives) for screenshots and manual review
-- Robots.txt, sitemap.xml checks
-- Manual browsing for auth workflows, upload points, error messages
-- Use Burp/BApps to capture client-side behavior and tokens
+- Wayback Machine — https://archive.org/web/
+- waybackurls
+- gau / gauplus
+  - Example:
 
----
+```bash
+echo example.com | gau --subs > gau_urls.txt
+```
 
-## Third-party surface & code repositories
-
-- Check for third-party integrations: CDNs, payment providers, auth providers, 3rd-party scripts
-- Search code repositories for secrets, endpoints, tokens:
-  - GitHub dorks: https://github.com/techgaun/github-dorks
-  - zen (email finder): https://github.com/s0md3v/zen
-- Jenkins, Bitbucket, GitLab public projects and CI artifacts
+- cc.py — https://github.com/si9int/cc.py
+- Authenticated crawling (Burp, OWASP ZAP)
 
 ---
 
-## Cloud enumeration & storage brute force
+## 7) JavaScript & API Surface Analysis
 
-- S3/Google Cloud/Azure storage checks:
-  - bucket_finder (digi.ninja): https://digi.ninja/projects/bucket_finder.php
-  - lazys3: https://github.com/nahamsec/lazys3
-  - teh_s3_bucketeers: https://github.com/tomdev/teh_s3_bucketeers
-  - Sandcastle / CloudScraper
-- Manual checks: https://buckets.grayhatwarfare.com/ and direct URL patterns:
+### Goals
+
+- Discover hidden endpoints, parameters, feature flags, hardcoded secrets/tokens.
+
+### Tools
+
+- JSParser — https://github.com/nahamsec/JSParser
+- LinkFinder — https://github.com/GerbenJavado/LinkFinder
+- grep/ripgrep quick triage:
+
+```bash
+rg -n "apiKey|secret|token|endpoint|eval\("
+```
+
+### Example workflow
+
+1. Gather JS via crawl + archives.
+2. Extract endpoints/params with LinkFinder/JSParser.
+3. Feed results into fuzzing lists (`ffuf`, `gf` patterns).
+
+---
+
+## 8) Site Inspection & Visual Recon
+
+- Aquatone — https://github.com/michenriksen/aquatone
+- EyeWitness
+- `robots.txt`
+- `sitemap.xml`
+- Manual browsing for:
+  - auth flows
+  - uploads
+  - error handling
+  - token behavior
+
+---
+
+## 9) Third-Party Surface
+
+### External dependencies
+
+- Applications and storefront components
+- CDNs
+- Payment systems
+- WAF providers
+- Third-party scripts/CSS/JS
+
+### Code repositories and CI exposure
+
+- GitHub dorks — https://github.com/techgaun/github-dorks
+- zen (email finder) — https://github.com/s0md3v/zen
+- GitLab / Bitbucket / Jenkins public artifacts
+
+---
+
+## 10) Cloud Enumeration & Storage Brute Force
+
+### Tools
+
+- bucket_finder — https://digi.ninja/projects/bucket_finder.php
+- lazys3 — https://github.com/nahamsec/lazys3
+- teh_s3_bucketeers — https://github.com/tomdev/teh_s3_bucketeers
+- Sandcastle — https://github.com/0xSearches/sandcastle
+- CloudScraper — https://github.com/jordanpotti/CloudScraper
+
+### Public bucket checks
+
+- https://buckets.grayhatwarfare.com/
+- Manual patterns:
   - `[bucket].s3.amazonaws.com`
   - `[bucket].storage.googleapis.com`
-- Look for misconfigured CORS or public write access
+
+### Misconfiguration checks
+
+- Public read/write
+- CORS misconfiguration
+- Directory listing/object leakage
 
 ---
 
-## Certificate & CT log enumeration
+## 11) Certificate & CT Log Enumeration
 
-- crt.sh: https://crt.sh/
+- crt.sh — https://crt.sh/
   - Example query: `https://crt.sh/?q=%25example.com`
-- Certspotter (API): https://certspotter.com/api/v0/certs?domain=example.com
-- Facebook CT monitoring: https://developers.facebook.com/tools/ct/
-- Censys and VirusTotal for additional certs/info
+- Facebook CT monitoring — https://developers.facebook.com/tools/ct/
+- Certspotter API — `https://certspotter.com/api/v0/certs?domain=`
+- Censys / VirusTotal certificate pivots
 
 ---
 
-## Technology profiling & fingerprinting
+## 12) Technology Profiling
 
-- BuiltWith: https://builtwith.com/
-- Wappalyzer: https://www.wappalyzer.com/
-- W3Techs / Netcraft / WhatCMS
-- Headers & responses: `curl -I`, `httpx -v`, or Nmap http-enum scripts
+- BuiltWith — https://builtwith.com/
+- Wappalyzer — https://www.wappalyzer.com/
+- W3Techs — https://w3techs.com/sites
+- Netcraft — https://sitereport.netcraft.com/
+- WhatCMS — https://whatcms.org/
+- Header/service fingerprinting:
 
----
-
-## Public disclosures, leaks & intel
-
-- HackerOne public disclosures: https://hackerone.com/hacktivity
-- Open Bug Bounty: https://www.openbugbounty.org/
-- Pastebin, GitHub/GitLab commits, Google dorks
-- Search for public paste/data leaks and credential dumps
+```bash
+curl -I https://target.tld
+```
 
 ---
 
-## Search engines & Shodan
+## 13) Public Disclosures, Leaks & Intel
 
-- Google dorks for indexed admin panels, config files, backups
-- Shodan for exposed services; search by org/IP/netblock for target
-
----
-
-## Output, triage & automation
-
-- Keep structured outputs: CSV/JSON for hosts, endpoints, JS artifacts.
-- Tag assets by criticality: external API, auth-required, upload endpoint, admin panel.
-- Use tools like `jq`, `csvkit` for processing.
-- Save raw tool outputs in a timestamped archive for reproducibility.
+- Open Bug Bounty — https://www.openbugbounty.org/
+- HackerOne Hacktivity — https://hackerone.com/hacktivity
+- Pastebin
+- Google dorks
+- Public commits and exposed credentials history
 
 ---
 
-## Common commands & examples
+## 14) Search Engines & Internet-wide Recon
 
-- Check wildcard: `dig +short random123456.example.com`
-- Zone transfer attempt: `dig AXFR example.com @ns1.example.com`
-- Amass passive: `amass enum -passive -d example.com -o amass_passive.txt`
-- Subfinder: `subfinder -d example.com -o subfinder.txt`
-- Massdns resolve: `massdns -r resolvers.txt -t A -o S -w resolved.txt candidate_subs.txt`
-- Waybackurls: `echo example.com | waybackurls > wayback_urls.txt`
-- Gauplus: `echo example.com | gauplus --providers wayback,archivedotorg > gau.txt`
-- LinkFinder: `python3 linkfinder.py -i file.js -o cli`
-- cewl: `cewl -m 4 -w dict.txt https://site.url`
+- Google Dorks (admin panels, backups, exposed files)
+- Shodan (`org`, `net`, service fingerprints)
 
 ---
 
-## Tool installation notes (quick)
+## 15) Brute-Force Files & Directories
 
-- amass: `go install github.com/OWASP/Amass/v3/...@latest`
-- subfinder: `go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest`
-- massdns: build from repo (C)
-- gau/gauplus: `go install github.com/lc/gau/v2/cmd/gau@latest` or gauplus repo
-- waybackurls: `go install github.com/tomnomnom/waybackurls@latest`
-- cewl: `gem install cewl` or apt package
-- LinkFinder / JSParser: Python tools; `pip install -r requirements.txt`
+- gobuster — https://github.com/OJ/gobuster
+- dirsearch — https://github.com/maurosoria/dirsearch
+- DirBuster — https://tools.kali.org/web-applications/dirbuster
+- snallygaster — https://github.com/hannob/snallygaster
+- fdb (File Disclosure Browser) — https://digi.ninja/projects/fdb.php
 
 ---
 
-## Prioritization guidance
+## 16) Google Hacking Database
 
-- High value first: exposed admin panels, auth bypass endpoints, file uploads, API keys in JS, exposed S3 buckets with public read/write.
-- Medium: internal-only subdomains, legacy apps with known CVEs.
-- Low: generic marketing pages, CDN-hosted static content (unless JS/API present).
+- Exploit-DB / GHDB — https://www.exploit-db.com/
 
 ---
 
-## References & resources
+## 17) Metadata Gathering
 
-- SecLists, JHaddix wordlists, OWASP Amass, ProjectDiscovery tools
-- Bookmark crt.sh, Wayback, Censys, Shodan for quick queries
+- FOCA — https://github.com/ElevenPaths/FOCA
+- strings
+- recon-ng (metacrawler) — https://bitbucket.org/LaNMaSteR53/recon-ng
+- ExifTool
 
 ---
 
-## Change log / author notes
+## 18) Social Media & People Surface
 
-- Enhanced: reorganized sections, added commands, prioritized playbook, JS/cloud focus, output & triage guidance.
+- Facebook
+- Twitter/X
+- LinkedIn
+
+---
+
+## 19) Email Recon
+
+### Gather addresses
+
+- theHarvester — https://github.com/laramies/theHarvester
+- Maltego — https://www.maltego.com/products/
+- Samurai — https://github.com/OffXec/Samurai
+- InSpy (LinkedIn enum) — https://github.com/leapsecurity/InSpy
+
+### Verify addresses / breach context
+
+- Hunter.io — https://hunter.io/email-finder
+- haveibeenpwned — https://haveibeenpwned.com/
+- Facebook/OSINT cross-verification
+
+---
+
+## 20) Useful Commands (Cheat Sheet)
+
+```bash
+# Wildcard check
+dig +short random123456.example.com
+
+# Zone transfer attempt
+dig AXFR example.com @ns1.example.com
+
+# Amass passive
+amass enum -passive -d example.com -o amass_passive.txt
+
+# Subfinder
+subfinder -d example.com -o subfinder.txt
+
+# Massdns resolve
+massdns -r resolvers.txt -t A -o S -w resolved.txt candidate_subs.txt
+
+# Waybackurls
+echo example.com | waybackurls > wayback_urls.txt
+
+# Gauplus
+echo example.com | gauplus --providers wayback,archivedotorg > gau.txt
+
+# LinkFinder
+python3 linkfinder.py -i file.js -o cli
+
+# CeWL
+cewl -m 4 -w dict.txt https://site.url
+```
+
+---
+
+## 21) Tool Install Notes (Quick)
+
+- amass
+
+```bash
+go install github.com/OWASP/Amass/v3/...@latest
+```
+
+- subfinder
+
+```bash
+go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+```
+
+- gau
+
+```bash
+go install github.com/lc/gau/v2/cmd/gau@latest
+```
+
+- waybackurls
+
+```bash
+go install github.com/tomnomnom/waybackurls@latest
+```
+
+- cewl
+
+```bash
+gem install cewl
+```
+
+- massdns: build from source (C project)
+- LinkFinder/JSParser: Python toolchain (`pip` requirements)
+
+---
+
+## 22) Prioritization Model
+
+### High-value targets first
+
+- Admin panels
+- Auth/authz bypass candidates
+- Upload endpoints
+- JS-exposed keys/tokens
+- Public-write cloud buckets
+
+### Medium
+
+- Internal subdomains with partial exposure
+- Legacy services with known-CVE fingerprints
+
+### Low
+
+- Static brochure/marketing pages (unless JS/API surface exists)
+
+---
+
+## 23) Output, Triage & Automation
+
+- Save structured outputs: hosts, endpoints, JS findings, cloud assets.
+- Tag by criticality (auth-required, upload, admin, external API).
+- Use `jq`, `csvkit`, and timeline snapshots for reproducibility.
+- Archive raw artifacts per run.
+
+---
+
+## 24) References
+
+- SecLists
+- JHaddix wordlists
+- OWASP Amass
+- ProjectDiscovery ecosystem
+- crt.sh / Wayback / Censys / Shodan
+
+---
+
+## Change Log
+
+- Reworked into a Notion-style, structured playbook.
+- Merged original checklist + expanded recon inventory.
+- Added grouped sections, command snippets, and prioritization flow.
